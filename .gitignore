@@ -1,3 +1,5 @@
 jobber.sqlite
+jobber.sqlite-journal
 jobber.log
 .jobber.log
+debug.log
