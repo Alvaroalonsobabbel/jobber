@@ -179,6 +179,22 @@ func TestParseLinkedinBody(t *testing.T) {
 	}
 }
 
+func TestIgnoreOffer(t *testing.T) {
+	d, closeDB := testDB(t)
+	defer closeDB() //nolint:errcheck
+	j := &Jobber{
+		client: &http.Client{Transport: newMockResp(t)},
+		logger: slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})),
+		db:     d,
+	}
+	queryID := int64(3)
+	offerID := "existing_offer"
+	offers := j.IgnoreOffer(queryID, offerID)
+	if len(offers) != 0 {
+		t.Errorf("expected no offers, got %d", len(offers))
+	}
+}
+
 func testDB(t testing.TB) (*db.Queries, func() error) {
 	schema, err := os.Open("../schema.sql")
 	if err != nil {

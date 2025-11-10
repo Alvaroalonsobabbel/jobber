@@ -119,6 +119,18 @@ func (j *Jobber) RunQuery(query *db.Query) []*db.Offer {
 	return offers
 }
 
+func (j *Jobber) IgnoreOffer(queryID int64, offerID string) []*db.Offer {
+	ctx := context.Background()
+	if err := j.db.IgnoreOffer(ctx, offerID); err != nil {
+		j.logger.Error("IgnoreOffer in jobber.IgnoreOffer", slog.String("error", err.Error()))
+	}
+	offers, err := j.db.ListOffers(ctx, queryID)
+	if err != nil {
+		j.logger.Error("ListOffers in jobber.IgnoreOffer", slog.String("error", err.Error()))
+	}
+	return offers
+}
+
 // fetchOffers gets job offers from LinkedIn based on the passed query params.
 func (j *Jobber) fetchOffers(query *db.Query) (io.ReadCloser, error) {
 	queryParams := url.Values{}

@@ -15,6 +15,13 @@ WHERE
 ORDER BY
     posted_at DESC;
 
+-- name: IgnoreOffer :exec
+UPDATE offers
+SET
+    ignored = 1
+WHERE
+    id = ?;
+
 -- name: CreateQuery :one
 INSERT INTO
     queries (keywords, location, f_tpr, f_jt)

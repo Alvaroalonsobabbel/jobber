@@ -71,6 +71,19 @@ func (q *Queries) CreateQuery(ctx context.Context, arg *CreateQueryParams) (*Que
 	return &i, err
 }
 
+const ignoreOffer = `-- name: IgnoreOffer :exec
+UPDATE offers
+SET
+    ignored = 1
+WHERE
+    id = ?
+`
+
+func (q *Queries) IgnoreOffer(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, ignoreOffer, id)
+	return err
+}
+
 const listOffers = `-- name: ListOffers :many
 SELECT
     id, query_id, title, company, location, ignored, posted_at, created_at
