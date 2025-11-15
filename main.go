@@ -48,7 +48,7 @@ var ddl string
 
 func initLogger() (*slog.Logger, io.Closer) {
 	// TODO: change file location to home folder
-	out, err := os.OpenFile(".jobber.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	out, err := os.OpenFile("jobber.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("unable to open log file: %v", err)
 	}
