@@ -43,18 +43,18 @@ func NewLinkedIn(logger *slog.Logger) *linkedIn {
 	}
 }
 
-func (l *linkedIn) PerformQuery(query *db.Query) ([]db.CreateOfferParams, error) {
+func (l *linkedIn) runQuery(query *db.Query) ([]db.CreateOfferParams, error) {
 	var totalOffers []db.CreateOfferParams
 	var offers []db.CreateOfferParams
 
 	for i := 0; i == 0 || len(offers) == searchInterval; i += searchInterval {
 		resp, err := l.fetchOffersPage(query, i)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetchOffers in PerformQuery: %v", err)
+			return nil, fmt.Errorf("failed to fetchOffersPage in runQuery: %v", err)
 		}
 		offers, err = l.parseLinkedInBody(resp)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse LinkedIn body PerformQuery: %v", err)
+			return nil, fmt.Errorf("failed to parseLinkedInBody body runQuery: %v", err)
 		}
 		totalOffers = append(totalOffers, offers...)
 	}
