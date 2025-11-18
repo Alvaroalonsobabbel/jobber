@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS queries (
     keywords TEXT NOT NULL,
     location TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    queried_at TIMESTAMP NOT NULL,
+    queried_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (keywords, location)
 );
 
@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS offers (
     posted_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_offers_posted_at ON offers (posted_at DESC);
 
 CREATE TABLE IF NOT EXISTS query_offers (
     query_id INTEGER NOT NULL,

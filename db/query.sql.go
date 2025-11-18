@@ -36,11 +36,11 @@ func (q *Queries) CreateOffer(ctx context.Context, arg *CreateOfferParams) error
 	return err
 }
 
-const createQuery = `-- name: CreateQuery :exec
+const createQuery = `-- name: CreateQuery :one
 INSERT INTO
     queries (keywords, location)
 VALUES
-    (?, ?)
+    (?, ?) RETURNING id, keywords, location, created_at, queried_at
 `
 
 type CreateQueryParams struct {
@@ -48,8 +48,33 @@ type CreateQueryParams struct {
 	Location string
 }
 
-func (q *Queries) CreateQuery(ctx context.Context, arg *CreateQueryParams) error {
-	_, err := q.db.ExecContext(ctx, createQuery, arg.Keywords, arg.Location)
+func (q *Queries) CreateQuery(ctx context.Context, arg *CreateQueryParams) (*Query, error) {
+	row := q.db.QueryRowContext(ctx, createQuery, arg.Keywords, arg.Location)
+	var i Query
+	err := row.Scan(
+		&i.ID,
+		&i.Keywords,
+		&i.Location,
+		&i.CreatedAt,
+		&i.QueriedAt,
+	)
+	return &i, err
+}
+
+const createQueryOfferAssoc = `-- name: CreateQueryOfferAssoc :exec
+INSERT INTO
+    query_offers (query_id, offer_id)
+VALUES
+    (?, ?)
+`
+
+type CreateQueryOfferAssocParams struct {
+	QueryID int64
+	OfferID string
+}
+
+func (q *Queries) CreateQueryOfferAssoc(ctx context.Context, arg *CreateQueryOfferAssocParams) error {
+	_, err := q.db.ExecContext(ctx, createQueryOfferAssoc, arg.QueryID, arg.OfferID)
 	return err
 }
 
@@ -81,7 +106,7 @@ func (q *Queries) GetQuery(ctx context.Context, arg *GetQueryParams) (*Query, er
 	return &i, err
 }
 
-const listOffersFromQuery = `-- name: ListOffersFromQuery :many
+const listOffers = `-- name: ListOffers :many
 SELECT
     o.id, o.title, o.company, o.location, o.posted_at, o.created_at
 FROM
@@ -89,17 +114,14 @@ FROM
     JOIN query_offers qo ON q.id = qo.query_id
     JOIN offers o ON qo.offer_id = o.id
 WHERE
-    q.keywords = ?
-    AND q.location = ?
+    q.id = ?
+    -- AND DATE(o.posted_at) >= ?
+ORDER BY
+    o.posted_at DESC
 `
 
-type ListOffersFromQueryParams struct {
-	Keywords string
-	Location string
-}
-
-func (q *Queries) ListOffersFromQuery(ctx context.Context, arg *ListOffersFromQueryParams) ([]*Offer, error) {
-	rows, err := q.db.QueryContext(ctx, listOffersFromQuery, arg.Keywords, arg.Location)
+func (q *Queries) ListOffers(ctx context.Context, id int64) ([]*Offer, error) {
+	rows, err := q.db.QueryContext(ctx, listOffers, id)
 	if err != nil {
 		return nil, err
 	}
@@ -126,4 +148,17 @@ func (q *Queries) ListOffersFromQuery(ctx context.Context, arg *ListOffersFromQu
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateQueryTS = `-- name: UpdateQueryTS :exec
+UPDATE queries
+SET
+    queried_at = CURRENT_TIMESTAMP
+WHERE
+    id = ?
+`
+
+func (q *Queries) UpdateQueryTS(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, updateQueryTS, id)
+	return err
 }

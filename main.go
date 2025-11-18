@@ -4,14 +4,15 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
-	"fmt"
 	"io"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
 
 	"github.com/Alvaroalonsobabbel/jobber/db"
 	"github.com/Alvaroalonsobabbel/jobber/jobber"
+	"github.com/Alvaroalonsobabbel/jobber/server"
 	_ "modernc.org/sqlite"
 )
 
@@ -23,18 +24,12 @@ func main() {
 	defer closer.Close()
 
 	j := jobber.New(logger, d)
-	offers, err := j.PerformQuery(&db.Query{
-		Keywords: "barista",
-		Location: "potsdam",
-	})
-	if err != nil {
+
+	svr := server.New(logger, j)
+	log.Println("starting server in port 80")
+	if err := http.ListenAndServe(":80", svr); err != nil {
 		log.Fatal(err)
 	}
-	o := offers[len(offers)-1]
-	fmt.Println("title: " + o.Title)
-	fmt.Println("location: " + o.Location)
-	fmt.Println("company: " + o.Company)
-	fmt.Println("link(edin): https://www.linkedin.com/jobs/view/" + o.ID)
 }
 
 //go:embed schema.sql
