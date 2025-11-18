@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/Alvaroalonsobabbel/jobber/db"
 	"modernc.org/sqlite"
@@ -83,5 +84,8 @@ func (j *Jobber) ListOffers(keywords, location string) ([]*db.Offer, error) {
 	if err := j.db.UpdateQueryTS(context.Background(), q.ID); err != nil {
 		return nil, fmt.Errorf("failed to update query timestamp: %w", err)
 	}
-	return j.db.ListOffers(context.Background(), q.ID)
+	return j.db.ListOffers(context.Background(), &db.ListOffersParams{
+		ID:       q.ID,
+		PostedAt: time.Now().AddDate(0, 0, -4),
+	})
 }

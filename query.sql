@@ -35,7 +35,7 @@ FROM
     JOIN offers o ON qo.offer_id = o.id
 WHERE
     q.id = ?
-    -- AND DATE(o.posted_at) >= ?
+    AND o.posted_at >= ?
 ORDER BY
     o.posted_at DESC;
 

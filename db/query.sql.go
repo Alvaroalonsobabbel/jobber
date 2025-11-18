@@ -115,13 +115,18 @@ FROM
     JOIN offers o ON qo.offer_id = o.id
 WHERE
     q.id = ?
-    -- AND DATE(o.posted_at) >= ?
+    AND o.posted_at >= ?
 ORDER BY
     o.posted_at DESC
 `
 
-func (q *Queries) ListOffers(ctx context.Context, id int64) ([]*Offer, error) {
-	rows, err := q.db.QueryContext(ctx, listOffers, id)
+type ListOffersParams struct {
+	ID       int64
+	PostedAt time.Time
+}
+
+func (q *Queries) ListOffers(ctx context.Context, arg *ListOffersParams) ([]*Offer, error) {
+	rows, err := q.db.QueryContext(ctx, listOffers, arg.ID, arg.PostedAt)
 	if err != nil {
 		return nil, err
 	}
