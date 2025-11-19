@@ -82,10 +82,10 @@ func (j *Jobber) ListOffers(keywords, location string) ([]*db.Offer, error) {
 		return nil, fmt.Errorf("failed to get query: %w", err)
 	}
 	if err := j.db.UpdateQueryTS(context.Background(), q.ID); err != nil {
-		return nil, fmt.Errorf("failed to update query timestamp: %w", err)
+		j.logger.Error("unable to update query timestamp", slog.Int("queryID", int(q.ID)), slog.String("error", err.Error()))
 	}
 	return j.db.ListOffers(context.Background(), &db.ListOffersParams{
 		ID:       q.ID,
-		PostedAt: time.Now().AddDate(0, 0, -4),
+		PostedAt: time.Now().AddDate(0, 0, -7), // List offers posted in the last 7 days.
 	})
 }
