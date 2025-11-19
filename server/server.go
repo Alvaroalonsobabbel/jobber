@@ -52,7 +52,7 @@ func (s *server) create() http.HandlerFunc {
 			return
 		}
 
-		url := fmt.Sprintf("%s/feeds?keywords=%s&location=%s", r.Host, q.Keywords, q.Location)
+		url := fmt.Sprintf("https://%s/feeds?keywords=%s&location=%s", r.Host, q.Keywords, q.Location)
 		w.Write([]byte(html.EscapeString(url)))
 	}
 }
