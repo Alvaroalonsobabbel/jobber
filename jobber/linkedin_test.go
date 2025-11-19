@@ -1,12 +1,14 @@
 package jobber
 
 import (
+	"database/sql"
 	"io"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/Alvaroalonsobabbel/jobber/db"
 )
@@ -17,47 +19,68 @@ func TestFetchOffersPage(t *testing.T) {
 		client: &http.Client{Transport: mockResp},
 		logger: slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})),
 	}
-	query := &db.Query{
-		Keywords: "golang",
-		Location: "the moon",
-	}
-	resp, err := l.fetchOffersPage(query, 0)
-	if err != nil {
-		t.Errorf("error fetching offers: %s", err.Error())
-	}
-	defer resp.Close()
-	values := mockResp.req.URL.Query()
-	if values.Get(paramKeywords) != "golang" {
-		t.Errorf("expected 'keywords' in query params to be 'golang', got %s", values.Get(paramKeywords))
-	}
-	if values.Get(paramLocation) != "the moon" {
-		t.Errorf("expected 'location' in query params to be 'the moon', got %s", values.Get(paramLocation))
-	}
-	if values.Get(paramFTPR) != lastWeek {
-		t.Errorf("expected 'f_TPR' in query params to be lastlastWeek, got %s", values.Get(paramFTPR))
-	}
-	if mockResp.req.URL.Host != "www.linkedin.com" {
-		t.Errorf("expected host to be 'www.linkedin.com', got %s", mockResp.req.URL.Host)
-	}
-	if mockResp.req.URL.Path != "/jobs-guest/jobs/api/seeMoreJobPostings/search" {
-		t.Errorf("expected path to be '/jobs-guest/jobs/api/seeMoreJobPostings/search', got %s", mockResp.req.URL.Path)
-	}
-	file, err := os.Open("example1.html")
-	if err != nil {
-		t.Fatalf("failed to open file: %s", err.Error())
-	}
-	defer file.Close()
-	want, err := io.ReadAll(file)
-	if err != nil {
-		t.Fatalf("failed to read example1.html file: %s", err.Error())
-	}
-	got, err := io.ReadAll(resp)
-	if err != nil {
-		t.Errorf("unable to read response body: %v", err)
-	}
-	if len(want) != len(got) {
-		t.Errorf("expected response body length to be %d, got %d", len(want), len(got))
-	}
+
+	t.Run("first time query", func(t *testing.T) {
+		query := &db.Query{
+			Keywords: "golang",
+			Location: "the moon",
+		}
+		resp, err := l.fetchOffersPage(query, 0)
+		if err != nil {
+			t.Errorf("error fetching offers: %s", err.Error())
+		}
+		defer resp.Close()
+		values := mockResp.req.URL.Query()
+		if values.Get(paramKeywords) != "golang" {
+			t.Errorf("expected 'keywords' in query params to be 'golang', got %s", values.Get(paramKeywords))
+		}
+		if values.Get(paramLocation) != "the moon" {
+			t.Errorf("expected 'location' in query params to be 'the moon', got %s", values.Get(paramLocation))
+		}
+		if values.Get(paramFTPR) != lastWeek {
+			t.Errorf("expected 'f_TPR' in query params to be lastlastWeek, got %s", values.Get(paramFTPR))
+		}
+		if mockResp.req.URL.Host != "www.linkedin.com" {
+			t.Errorf("expected host to be 'www.linkedin.com', got %s", mockResp.req.URL.Host)
+		}
+		if mockResp.req.URL.Path != "/jobs-guest/jobs/api/seeMoreJobPostings/search" {
+			t.Errorf("expected path to be '/jobs-guest/jobs/api/seeMoreJobPostings/search', got %s", mockResp.req.URL.Path)
+		}
+		file, err := os.Open("example1.html")
+		if err != nil {
+			t.Fatalf("failed to open file: %s", err.Error())
+		}
+		defer file.Close()
+		want, err := io.ReadAll(file)
+		if err != nil {
+			t.Fatalf("failed to read example1.html file: %s", err.Error())
+		}
+		got, err := io.ReadAll(resp)
+		if err != nil {
+			t.Errorf("unable to read response body: %v", err)
+		}
+		if len(want) != len(got) {
+			t.Errorf("expected response body length to be %d, got %d", len(want), len(got))
+		}
+	})
+
+	t.Run("queries with UpdatedAt field should have relative FTPR", func(t *testing.T) {
+		query := &db.Query{
+			Keywords:  "golang",
+			Location:  "the moon",
+			UpdatedAt: sql.NullTime{Valid: true, Time: time.Now().Add(-time.Hour)},
+		}
+		resp, err := l.fetchOffersPage(query, 0)
+		if err != nil {
+			t.Errorf("error fetching offers: %s", err.Error())
+		}
+		defer resp.Close()
+		gotFTPR := mockResp.req.URL.Query().Get(paramFTPR)
+		if gotFTPR != "r3600" {
+			t.Errorf("expected FT_PR to be 'r3600', got %s", gotFTPR)
+		}
+	})
+
 }
 
 func TestParseLinkedInBody(t *testing.T) {

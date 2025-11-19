@@ -70,15 +70,21 @@ func (l *linkedIn) search(query *db.Query) ([]db.CreateOfferParams, error) {
 func (l *linkedIn) fetchOffersPage(query *db.Query, start int) (io.ReadCloser, error) {
 	qp := url.Values{}
 	qp.Add(paramKeywords, query.Keywords)
-
-	// TODO: make the FTPR param variable from when the last query was performed.
-	qp.Add(paramFTPR, lastWeek)
 	if query.Location != "" {
 		qp.Add(paramLocation, query.Location)
 	}
 	if start != 0 {
 		qp.Add(paramStart, strconv.Itoa(start))
 	}
+
+	ftpr := lastWeek
+	if query.UpdatedAt.Valid {
+		// UpdatedAt is updated every time we run the query against LinkedIn.
+		// If the query has a valid UpdateAt field we don't use a week for
+		// the FTPR value but the time difference between the last query and now.
+		ftpr = fmt.Sprintf("r%d", int(time.Now().Sub(query.UpdatedAt.Time).Seconds()))
+	}
+	qp.Add(paramFTPR, ftpr)
 
 	url, err := url.Parse(linkedInURL)
 	if err != nil {
