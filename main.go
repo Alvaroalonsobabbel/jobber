@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
-	"fmt"
+	"errors"
 	"io"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -19,8 +20,11 @@ import (
 )
 
 func main() {
-	ctx, ctxCancel := context.WithCancel(context.Background())
-	defer ctxCancel()
+	var (
+		ctx    = context.Background()
+		svrErr = make(chan error, 1)
+		c      = make(chan os.Signal, 1)
+	)
 
 	logger, logCloser := initLogger()
 	defer logCloser.Close()
@@ -28,37 +32,32 @@ func main() {
 	d, dbCloser := initDB(ctx)
 	defer dbCloser.Close()
 
-	j, jobberWait := jobber.New(ctx, logger, d)
-	svr := server.New(logger, j)
+	j, jCloser := jobber.New(logger, d)
+	defer jCloser()
 
-	c := make(chan os.Signal, 1)
+	svr := server.New(logger, j)
+	defer svr.Shutdown(ctx)
+
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		log.Println("starting server in port 80")
+		log.Println("starting server in port " + svr.Addr)
 		if err := svr.ListenAndServe(); err != nil {
-			log.Fatal(err)
+			if errors.Is(err, http.ErrServerClosed) {
+				log.Println(err)
+			} else {
+				log.Println(err)
+				svrErr <- err
+			}
 		}
 	}()
 
-	go func() {
-		<-c
-		fmt.Println("\nSignal received, cleaning up...")
-		if err := svr.Shutdown(ctx); err != nil {
-			fmt.Printf("error shutting down server: %v\n", err)
-		}
-		ctxCancel()
-		jobberWait()
-		if err := dbCloser.Close(); err != nil {
-			fmt.Printf("error closing database: %v\n", err)
-		}
-		if err := logCloser.Close(); err != nil {
-			fmt.Printf("error closing logger: %v\n", err)
-		}
-		os.Exit(1)
-	}()
-
-	select {}
+	select {
+	case <-svrErr:
+		log.Println("\nserver error, shutting down...")
+	case <-c:
+		log.Println("\nshutting down...")
+	}
 }
 
 //go:embed schema.sql
@@ -78,6 +77,12 @@ func initDB(ctx context.Context) (*db.Queries, io.Closer) {
 	d, err := sql.Open("sqlite", "jobber.sqlite")
 	if err != nil {
 		log.Fatalf("unable to open database: %v", err)
+	}
+	if _, err := d.ExecContext(ctx, "PRAGMA journal_mode = WAL"); err != nil {
+		log.Fatalf("unable to set WAL mode: %v", err)
+	}
+	if _, err := d.ExecContext(ctx, "PRAGMA busy_timeout = 30000"); err != nil {
+		log.Fatalf("unable to set busy timeout: %v", err)
 	}
 	if _, err := d.ExecContext(ctx, ddl); err != nil {
 		log.Fatalf("unable to create database: %v", err)
