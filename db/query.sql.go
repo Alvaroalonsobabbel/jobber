@@ -193,24 +193,31 @@ func (q *Queries) ListOffers(ctx context.Context, arg *ListOffersParams) ([]*Off
 
 const listQueries = `-- name: ListQueries :many
 SELECT
-    id
+    id, keywords, location, created_at, queried_at, updated_at
 FROM
     queries
 `
 
-func (q *Queries) ListQueries(ctx context.Context) ([]int64, error) {
+func (q *Queries) ListQueries(ctx context.Context) ([]*Query, error) {
 	rows, err := q.db.QueryContext(ctx, listQueries)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []int64
+	var items []*Query
 	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
+		var i Query
+		if err := rows.Scan(
+			&i.ID,
+			&i.Keywords,
+			&i.Location,
+			&i.CreatedAt,
+			&i.QueriedAt,
+			&i.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
-		items = append(items, id)
+		items = append(items, &i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

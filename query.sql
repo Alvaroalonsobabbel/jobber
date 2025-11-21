@@ -6,7 +6,7 @@ VALUES
 
 -- name: ListQueries :many
 SELECT
-    id
+    *
 FROM
     queries;
 
