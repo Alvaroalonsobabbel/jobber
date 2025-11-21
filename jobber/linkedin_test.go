@@ -126,7 +126,7 @@ func TestSearch(t *testing.T) {
 		Keywords: "golang",
 		Location: "the moon",
 	}
-	offers, err := l.search(query)
+	offers, err := l.scrape(query)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}

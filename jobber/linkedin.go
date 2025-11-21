@@ -47,7 +47,7 @@ func NewLinkedIn(logger *slog.Logger) *linkedIn {
 // search runs a linkedin search based on a query.
 // It will paginate over the search results until it doesn't find any more offers,
 // scrape the data and return a slice of offers ready to be added to the DB.
-func (l *linkedIn) search(query *db.Query) ([]db.CreateOfferParams, error) {
+func (l *linkedIn) scrape(query *db.Query) ([]db.CreateOfferParams, error) {
 	var totalOffers []db.CreateOfferParams
 	var offers []db.CreateOfferParams
 

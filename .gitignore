@@ -1,3 +1,4 @@
 .DS_Store
 jobber.sqlite*
 jobber.log
+postgres-data
