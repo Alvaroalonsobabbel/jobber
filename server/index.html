@@ -31,6 +31,28 @@
         opacity: 0;
         visibility: hidden;
       }
+
+      .copy-button {
+        margin-left: 10px;
+        padding: 5px 10px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+
+      .copy-feedback {
+        color: #28a745;
+        font-size: 14px;
+        margin-left: 10px;
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out;
+      }
+
+      .copy-feedback.show {
+        opacity: 1;
+      }
     </style>
   </head>
   <body>
@@ -57,5 +79,30 @@
       <br />
       <p style="text-align: center">- jobber -</p>
     </footer>
+
+    <script>
+    function copyToClipboard(url) {
+      navigator.clipboard.writeText(url).then(() => {
+        showCopyFeedback();
+      }).catch(err => {
+        console.error('Failed to copy: ', err);
+        showCopyFeedback('Failed to copy');
+      });
+    }
+
+    function showCopyFeedback(message = 'Copied!') {
+      let feedback = document.querySelector('.copy-feedback');
+      if (!feedback) {
+        feedback = document.createElement('span');
+        feedback.className = 'copy-feedback';
+        document.querySelector('.copy-button').parentNode.appendChild(feedback);
+      }
+      feedback.textContent = message;
+      feedback.classList.add('show');
+      setTimeout(() => {
+        feedback.classList.remove('show');
+      }, 2000);
+    }
+    </script>
   </body>
 </html>
