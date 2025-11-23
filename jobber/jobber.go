@@ -1,5 +1,8 @@
-// Package jobber retrieves job offers from linedin based on query
-// parameters and store the queries and the job offers on the database.
+// Package jobber orchestrates scheduled scraping of job offers from external sources based on
+// user-defined search queries. It manages query lifecycle (creation, scheduling, expiration),
+// persists results to a database, and automatically prunes stale queries after 7 days of inactivity.
+// Each query runs on an hourly cron schedule, deduplicates offers, and maintains query-offer
+// associations for efficient retrieval.
 package jobber
 
 import (
@@ -10,39 +13,36 @@ import (
 	"time"
 
 	"github.com/Alvaroalonsobabbel/jobber/db"
+	"github.com/Alvaroalonsobabbel/jobber/scrape"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type scraper interface {
-	scrape(*db.Query) ([]db.CreateOfferParams, error)
-}
-
 type Jobber struct {
-	ctx      context.Context
-	linkedIn scraper
-	logger   *slog.Logger
-	db       *db.Queries
-	sched    gocron.Scheduler
+	ctx    context.Context
+	scpr   scrape.Scraper
+	logger *slog.Logger
+	db     *db.Queries
+	sched  gocron.Scheduler
 }
 
 func New(log *slog.Logger, db *db.Queries) (*Jobber, func()) {
-	return newConfigurableJobber(log, db, NewLinkedIn(log))
+	return NewConfigurableJobber(log, db, scrape.LinkedIn(log))
 }
 
-func newConfigurableJobber(log *slog.Logger, db *db.Queries, li scraper) (*Jobber, func()) {
+func NewConfigurableJobber(log *slog.Logger, db *db.Queries, s scrape.Scraper) (*Jobber, func()) {
 	sched, err := gocron.NewScheduler()
 	if err != nil {
 		log.Error("failed to create scheduler", slog.String("error", err.Error()))
 	}
 	j := &Jobber{
-		ctx:      context.Background(),
-		linkedIn: li,
-		logger:   log,
-		db:       db,
-		sched:    sched,
+		ctx:    context.Background(),
+		scpr:   s,
+		logger: log,
+		db:     db,
+		sched:  sched,
 	}
 
 	// Initial queries scheduling.
@@ -134,7 +134,7 @@ func (j *Jobber) runQuery(qID int64) {
 	}
 
 	// TODO: extend ctx to scraper
-	offers, err := j.linkedIn.scrape(q)
+	offers, err := j.scpr.Scrape(q)
 	if err != nil {
 		j.logger.Error("unable to perform linkedIn search in jobber.runQuery", slog.Int64("queryID", q.ID), slog.String("error", err.Error()))
 	}

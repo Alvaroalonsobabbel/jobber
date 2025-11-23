@@ -10,19 +10,14 @@ import (
 	"time"
 
 	"github.com/Alvaroalonsobabbel/jobber/db"
+	"github.com/Alvaroalonsobabbel/jobber/scrape"
 )
-
-type mockScraper struct{}
-
-func (m *mockScraper) scrape(*db.Query) ([]db.CreateOfferParams, error) {
-	return []db.CreateOfferParams{}, nil
-}
 
 func TestCreateQuery(t *testing.T) {
 	l := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{}))
 	d, dbCloser := db.NewTestDB(t)
 	defer dbCloser()
-	j, jCloser := newConfigurableJobber(l, d, &mockScraper{})
+	j, jCloser := NewConfigurableJobber(l, d, scrape.MockScraper)
 	defer jCloser()
 
 	t.Run("creates a query", func(t *testing.T) {
@@ -71,7 +66,7 @@ func TestListOffers(t *testing.T) {
 	l := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{}))
 	d, dbCloser := db.NewTestDB(t)
 	defer dbCloser()
-	j, jCloser := newConfigurableJobber(l, d, &mockScraper{})
+	j, jCloser := NewConfigurableJobber(l, d, scrape.MockScraper)
 	defer jCloser()
 
 	tests := []struct {
