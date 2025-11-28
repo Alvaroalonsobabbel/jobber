@@ -15,6 +15,7 @@ import (
 	"github.com/Alvaroalonsobabbel/jobber/jobber"
 	"github.com/Alvaroalonsobabbel/jobber/server"
 	"github.com/jackc/pgx/v5/pgxpool"
+	_ "golang.org/x/crypto/x509roots/fallback" // CA bundle for FROM Scratch
 )
 
 func main() {
@@ -81,7 +82,11 @@ func initLogger() (*slog.Logger, func()) {
 }
 
 func initDB(ctx context.Context) (*db.Queries, func()) {
-	connStr := fmt.Sprintf("host=localhost user=jobber password=%s dbname=jobber sslmode=disable", os.Getenv("POSTGRES_PASSWORD"))
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	connStr := fmt.Sprintf("host=%s user=jobber password=%s dbname=jobber sslmode=disable", host, os.Getenv("POSTGRES_PASSWORD"))
 	conn, err := pgxpool.New(ctx, connStr)
 	if err != nil {
 		log.Fatalf("unable to initialized db connection: %v", err)
