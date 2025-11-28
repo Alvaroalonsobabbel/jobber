@@ -78,6 +78,15 @@ func TestServer(t *testing.T) {
 			wantHeaders: map[string]string{"Content-Type": "application/rss+xml"},
 			wantBody:    true,
 		},
+		{
+			name:   "with missing param keywords",
+			path:   "/feeds",
+			method: http.MethodGet,
+			params: map[string]string{
+				queryParamLocation: "berlin",
+			},
+			wantStatus: http.StatusBadRequest,
+		},
 	}
 
 	client := http.DefaultClient
@@ -120,9 +129,12 @@ func TestServer(t *testing.T) {
 				if err != nil {
 					t.Errorf("unable to read response body: %v", err)
 				}
+				// Scrubbing date and times.
 				scrubber := func(s string) string {
 					re := regexp.MustCompile(`<pubDate>[^<]+</pubDate>`)
-					return re.ReplaceAllString(s, "<pubDate>DATETIME_SCRUBBED</pubDate>")
+					noPubDate := re.ReplaceAllString(s, "<pubDate>DATETIME_SCRUBBED</pubDate>")
+					re = regexp.MustCompile(`(posted [^<]+)`)
+					return re.ReplaceAllString(noPubDate, "(posted POSTED_AT_SCRUBBED)")
 				}
 				approvals.UseFolder("approvals")
 				approvals.VerifyString(t, string(body),

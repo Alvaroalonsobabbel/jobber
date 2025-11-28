@@ -18,12 +18,14 @@ import (
 )
 
 const (
+	// Params.
 	queryParamKeywords = "keywords"
 	queryParamLocation = "location"
 
+	// Create RSS feed response for htmlx.
 	createResponse = `<p>RSS Feed Created Successfully!</p><p><button class="copy-button" onclick="copyToClipboard('%s')">Copy Feed URL</button></p>`
 
-	// Assets
+	// Assets.
 	assetsGlob = "assets/*"
 	assetIndex = "index.html"
 	assetRSS   = "rss.goxml"
@@ -68,14 +70,9 @@ func (s *server) index() http.HandlerFunc {
 
 func (s *server) create() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		params, err := validateParams([]string{queryParamKeywords, queryParamLocation}, r)
+		params, err := validateParams([]string{queryParamKeywords, queryParamLocation}, w, r)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
 			s.logger.Info("missing params in server.create", slog.String("error", err.Error()))
-			_, err := w.Write([]byte(err.Error()))
-			if err != nil {
-				s.logger.Error("unable to write response in server.create, validateParams", slog.String("error", err.Error()))
-			}
 			return
 		}
 		if err := s.jobber.CreateQuery(params.Get(queryParamKeywords), params.Get(queryParamLocation)); err != nil {
@@ -92,43 +89,44 @@ func (s *server) create() http.HandlerFunc {
 		}
 		u.RawQuery = params.Encode()
 
-		response := fmt.Sprintf(createResponse, u.String())
-		_, err = w.Write([]byte(response))
+		_, err = fmt.Fprintf(w, createResponse, u.String())
 		if err != nil {
 			s.logger.Error("failed to write response", slog.String("url", u.String()), slog.String("error", err.Error()))
 		}
 	}
 }
 
-type data struct {
-	Keywords, Location string
-	Offers             []*db.Offer
+type feedData struct {
+	Keywords string
+	Location string
+	Offers   []*db.Offer
+	NotFound bool
 }
 
 func (s *server) feed() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		k := r.FormValue(queryParamKeywords)
-		l := r.FormValue(queryParamLocation)
-
-		offers, err := s.jobber.ListOffers(k, l)
+		params, err := validateParams([]string{queryParamKeywords, queryParamLocation}, w, r)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				// TODO: return xml with invalid query?
-				s.logger.Info("no query found", "keywords", k, "location", l)
-				http.Error(w, "no query found", http.StatusNotFound)
-				return
-			}
-			s.logger.Error("failed to get query: " + err.Error())
-			http.Error(w, "failed to get query", http.StatusInternalServerError)
+			s.logger.Info("missing params in server.feed", slog.String("error", err.Error()))
 			return
 		}
-
-		w.Header().Add("Content-Type", "application/rss+xml")
-		d := &data{
-			Keywords: k,
-			Location: l,
-			Offers:   offers,
+		d := &feedData{
+			Keywords: params.Get(queryParamKeywords),
+			Location: params.Get(queryParamLocation),
 		}
+		offers, err := s.jobber.ListOffers(params.Get(queryParamKeywords), params.Get(queryParamLocation))
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				d.NotFound = true
+				s.logger.Info("no query found in server.feed", slog.Any("params", params), slog.String("error", err.Error()))
+			} else {
+				s.logger.Error("failed to get query in server.feed: " + err.Error())
+				http.Error(w, "it's not you it's me", http.StatusInternalServerError)
+				return
+			}
+		}
+		d.Offers = offers
+		w.Header().Add("Content-Type", "application/rss+xml")
 		if err := s.templates.ExecuteTemplate(w, assetRSS, d); err != nil {
 			s.logger.Error("failed to execute template in server.feed: " + err.Error())
 			http.Error(w, "it's not you it's me", http.StatusInternalServerError)
@@ -139,7 +137,8 @@ func (s *server) feed() http.HandlerFunc {
 
 // validateParams receives a list of params, validate they've
 // been supplied in the request and normalizes them.
-func validateParams(params []string, r *http.Request) (url.Values, error) {
+// If a param is missing, it will respond with 400.
+func validateParams(params []string, w http.ResponseWriter, r *http.Request) (url.Values, error) {
 	missing := []string{}
 	valid := url.Values{}
 	for _, p := range params {
@@ -151,6 +150,11 @@ func validateParams(params []string, r *http.Request) (url.Values, error) {
 		valid.Add(p, strings.ToLower(strings.TrimSpace(v)))
 	}
 	if len(missing) != 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		_, err := fmt.Fprintf(w, "missing params: %v", missing)
+		if err != nil {
+			return nil, fmt.Errorf("unable to write response in validateParams: %w", err)
+		}
 		return nil, fmt.Errorf("missing params: %v", missing)
 	}
 	return valid, nil
@@ -163,5 +167,8 @@ var funcMap = template.FuncMap{
 	"title": func(o *db.Offer) string {
 		t := fmt.Sprintf("%s at %s (posted %s)", o.Title, o.Company, o.PostedAt.Time.Format("Jan 2"))
 		return html.EscapeString(t)
+	},
+	"now": func() string {
+		return time.Now().Format(time.RFC1123Z)
 	},
 }
