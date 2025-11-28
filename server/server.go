@@ -61,8 +61,7 @@ func New(l *slog.Logger, j *jobber.Jobber) (*http.Server, error) {
 func (s *server) index() http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		if err := s.templates.ExecuteTemplate(w, assetIndex, nil); err != nil {
-			s.logger.Error("failed to execute template in server.index", slog.String("error", err.Error()))
-			http.Error(w, "it's not you it's me", http.StatusInternalServerError)
+			s.internalError(w, "failed to execute template in server.index", err)
 			return
 		}
 	}
@@ -76,15 +75,13 @@ func (s *server) create() http.HandlerFunc {
 			return
 		}
 		if err := s.jobber.CreateQuery(params.Get(queryParamKeywords), params.Get(queryParamLocation)); err != nil {
-			s.logger.Error("failed to create query", slog.Any("params", params), slog.String("error", err.Error()))
-			http.Error(w, "it's not you it's me", http.StatusInternalServerError)
+			s.internalError(w, "failed to create query", err)
 			return
 		}
 
 		u, err := url.Parse("https://" + r.Host + "/feeds")
 		if err != nil {
-			s.logger.Error("failed to parse url in server.create", slog.String("error", err.Error()))
-			http.Error(w, "it's not you it's me", http.StatusInternalServerError)
+			s.internalError(w, "failed to parse url in server.create", err)
 			return
 		}
 		u.RawQuery = params.Encode()
@@ -120,19 +117,22 @@ func (s *server) feed() http.HandlerFunc {
 				d.NotFound = true
 				s.logger.Info("no query found in server.feed", slog.Any("params", params), slog.String("error", err.Error()))
 			} else {
-				s.logger.Error("failed to get query in server.feed: " + err.Error())
-				http.Error(w, "it's not you it's me", http.StatusInternalServerError)
+				s.internalError(w, "failed to get query in server.feed", err)
 				return
 			}
 		}
 		d.Offers = offers
 		w.Header().Add("Content-Type", "application/rss+xml")
 		if err := s.templates.ExecuteTemplate(w, assetRSS, d); err != nil {
-			s.logger.Error("failed to execute template in server.feed: " + err.Error())
-			http.Error(w, "it's not you it's me", http.StatusInternalServerError)
+			s.internalError(w, "failed to execute template in server.feed", err)
 			return
 		}
 	}
+}
+
+func (s *server) internalError(w http.ResponseWriter, msg string, err error) {
+	s.logger.Error(msg, slog.String("error", err.Error()))
+	http.Error(w, "it's not you it's me", http.StatusInternalServerError)
 }
 
 // validateParams receives a list of params, validate they've
