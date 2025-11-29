@@ -131,8 +131,12 @@ func TestServer(t *testing.T) {
 				}
 				// Scrubbing date and times.
 				scrubber := func(s string) string {
-					re := regexp.MustCompile(`<pubDate>[^<]+</pubDate>`)
-					noPubDate := re.ReplaceAllString(s, "<pubDate>DATETIME_SCRUBBED</pubDate>")
+					re := regexp.MustCompile(`<a href=[^<]+>here</a>`)
+					noHREF := re.ReplaceAllString(s, "<a href=HREF_SCRUBBED>here</a>")
+					re = regexp.MustCompile(`<link>[^<]+</link>`)
+					noLink := re.ReplaceAllString(noHREF, "<link>LINK_SCRUBBED</link>")
+					re = regexp.MustCompile(`<pubDate>[^<]+</pubDate>`)
+					noPubDate := re.ReplaceAllString(noLink, "<pubDate>DATETIME_SCRUBBED</pubDate>")
 					re = regexp.MustCompile(`(posted [^<]+)`)
 					return re.ReplaceAllString(noPubDate, "(posted POSTED_AT_SCRUBBED)")
 				}

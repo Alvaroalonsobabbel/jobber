@@ -100,6 +100,7 @@ func (s *server) create() http.HandlerFunc {
 type feedData struct {
 	Keywords string
 	Location string
+	Host     string
 	Offers   []*db.Offer
 	NotFound bool
 }
@@ -114,6 +115,7 @@ func (s *server) feed() http.HandlerFunc {
 		d := &feedData{
 			Keywords: params.Get(queryParamKeywords),
 			Location: params.Get(queryParamLocation),
+			Host:     r.Host,
 		}
 		offers, err := s.jobber.ListOffers(params.Get(queryParamKeywords), params.Get(queryParamLocation))
 		if err != nil {
