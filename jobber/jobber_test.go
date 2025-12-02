@@ -145,7 +145,7 @@ func TestRunQuery(t *testing.T) {
 	j, jCloser := NewConfigurableJobber(l, d, mockScraper)
 	defer jCloser()
 
-	t.Run("on valid query", func(t *testing.T) {
+	t.Run("with valid query", func(t *testing.T) {
 		q, err := d.GetQuery(context.Background(), &db.GetQueryParams{Keywords: "golang", Location: "berlin"})
 		if err != nil {
 			t.Errorf("unable to retrieve seed query: %v", err)
@@ -169,15 +169,15 @@ func TestRunQuery(t *testing.T) {
 		// Test adding offer and ignoring existing offer
 	})
 
-	t.Run("on older than 7 days query", func(t *testing.T) {
+	t.Run("with older than 7 days query deletes the query", func(t *testing.T) {
 		q, err := d.GetQuery(context.Background(), &db.GetQueryParams{Keywords: "python", Location: "san francisco"})
 		if err != nil {
 			t.Errorf("unable to retrieve seed query: %v", err)
 		}
 		j.runQuery(q.ID)
-		_, err2 := d.GetQuery(context.Background(), &db.GetQueryParams{Keywords: "python", Location: "san francisco"})
-		if !errors.Is(sql.ErrNoRows, err2) { // FIX THIS
-			t.Errorf("query should have been deleted but got: %v", err2)
+		_, err = d.GetQuery(context.Background(), &db.GetQueryParams{Keywords: "python", Location: "san francisco"})
+		if !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("query should have been deleted but got: %v", err)
 		}
 	})
 }
