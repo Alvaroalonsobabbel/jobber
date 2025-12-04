@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/docker/go-connections/nat"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -57,8 +58,17 @@ func NewTestDB(t testing.TB) (*Queries, func()) {
 		t.Fatalf("unable to initialize db connection: %v", err)
 	}
 
-	if err := conn.Ping(ctx); err != nil {
-		t.Fatalf("unable to ping the DB: %v", err)
+	// Pings the DB with retry mechanism.
+	var pingErr error
+	for range 5 {
+		pingErr = conn.Ping(ctx)
+		if pingErr != nil {
+			time.Sleep(time.Second)
+			continue
+		}
+	}
+	if pingErr != nil {
+		t.Fatalf("unable to ping the DB: %v", pingErr)
 	}
 
 	_, err = conn.Exec(ctx, seed)
