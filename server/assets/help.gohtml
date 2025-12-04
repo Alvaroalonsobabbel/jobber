@@ -1,0 +1,30 @@
+{{template "top" .}}
+<main>
+    <style>
+    details {
+        width: max-content;
+        margin: 0 auto;
+        text-align: center;
+    }
+    details > summary {
+        list-style-type: none;
+    }
+
+    details > summary::before {
+        content: '▹ ';
+    }
+
+    details[open] > summary::before {
+        content: '▿ ';
+    }
+    </style>
+    <details>
+    <summary><b>An example</b></summary>
+    With some example text shown when expanded.
+    </details>
+    <details>
+    <summary>An example</summary>
+    With some example text shown when expanded.
+    </details>
+</main>
+{{template "bottom" .}}
