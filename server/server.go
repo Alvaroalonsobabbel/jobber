@@ -29,7 +29,7 @@ const (
 
 	// Assets.
 	assetsGlob = "assets/*"
-	assetIndex = "index.html"
+	assetIndex = "index.gohtml"
 	assetRSS   = "rss.goxml"
 )
 
