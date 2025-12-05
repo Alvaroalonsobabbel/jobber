@@ -82,7 +82,7 @@ func (s *server) index() http.HandlerFunc {
 }
 
 func (s *server) help() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
 		if err := s.templates.ExecuteTemplate(w, assetHelp, nil); err != nil {
 			s.internalError(w, "failed to execute template in server.help", err)
 			return
