@@ -1,4 +1,4 @@
-module github.com/Alvaroalonsobabbel/jobber
+module github.com/alwedo/jobber
 
 go 1.25.5
 

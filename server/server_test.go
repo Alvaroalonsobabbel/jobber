@@ -9,9 +9,9 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/Alvaroalonsobabbel/jobber/db"
-	"github.com/Alvaroalonsobabbel/jobber/jobber"
-	"github.com/Alvaroalonsobabbel/jobber/scrape"
+	"github.com/alwedo/jobber/db"
+	"github.com/alwedo/jobber/jobber"
+	"github.com/alwedo/jobber/scrape"
 	approvals "github.com/approvals/go-approval-tests"
 )
 

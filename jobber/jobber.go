@@ -12,8 +12,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/Alvaroalonsobabbel/jobber/db"
-	"github.com/Alvaroalonsobabbel/jobber/scrape"
+	"github.com/alwedo/jobber/db"
+	"github.com/alwedo/jobber/scrape"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"

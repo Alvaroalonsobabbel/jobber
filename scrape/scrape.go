@@ -3,7 +3,7 @@
 // Includes a mock implementation for testing.
 package scrape
 
-import "github.com/Alvaroalonsobabbel/jobber/db"
+import "github.com/alwedo/jobber/db"
 
 type Scraper interface {
 	Scrape(*db.Query) ([]db.CreateOfferParams, error)

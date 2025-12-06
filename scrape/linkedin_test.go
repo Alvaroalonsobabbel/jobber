@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Alvaroalonsobabbel/jobber/db"
+	"github.com/alwedo/jobber/db"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 

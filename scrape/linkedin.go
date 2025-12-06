@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Alvaroalonsobabbel/jobber/db"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/alwedo/jobber/db"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 

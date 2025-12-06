@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Alvaroalonsobabbel/jobber/db"
-	"github.com/Alvaroalonsobabbel/jobber/scrape"
+	"github.com/alwedo/jobber/db"
+	"github.com/alwedo/jobber/scrape"
 )
 
 func TestConstructor(t *testing.T) {

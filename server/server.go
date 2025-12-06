@@ -13,8 +13,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/Alvaroalonsobabbel/jobber/db"
-	"github.com/Alvaroalonsobabbel/jobber/jobber"
+	"github.com/alwedo/jobber/db"
+	"github.com/alwedo/jobber/jobber"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )

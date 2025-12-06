@@ -11,9 +11,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Alvaroalonsobabbel/jobber/db"
-	"github.com/Alvaroalonsobabbel/jobber/jobber"
-	"github.com/Alvaroalonsobabbel/jobber/server"
+	"github.com/alwedo/jobber/db"
+	"github.com/alwedo/jobber/jobber"
+	"github.com/alwedo/jobber/server"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "golang.org/x/crypto/x509roots/fallback" // CA bundle for FROM Scratch
 )
