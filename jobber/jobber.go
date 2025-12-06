@@ -15,17 +15,19 @@ import (
 	"github.com/Alvaroalonsobabbel/jobber/db"
 	"github.com/Alvaroalonsobabbel/jobber/scrape"
 	"github.com/go-co-op/gocron/v2"
+	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Jobber struct {
-	ctx    context.Context
-	scpr   scrape.Scraper
-	logger *slog.Logger
-	db     *db.Queries
-	sched  gocron.Scheduler
+	ctx       context.Context
+	scpr      scrape.Scraper
+	logger    *slog.Logger
+	db        *db.Queries
+	sched     gocron.Scheduler
+	jobDoneCh chan struct{}
 }
 
 func New(log *slog.Logger, db *db.Queries) (*Jobber, func()) {
@@ -38,11 +40,12 @@ func NewConfigurableJobber(log *slog.Logger, db *db.Queries, s scrape.Scraper) (
 		log.Error("failed to create scheduler", slog.String("error", err.Error()))
 	}
 	j := &Jobber{
-		ctx:    context.Background(),
-		scpr:   s,
-		logger: log,
-		db:     db,
-		sched:  sched,
+		ctx:       context.Background(),
+		scpr:      s,
+		logger:    log,
+		db:        db,
+		sched:     sched,
+		jobDoneCh: make(chan struct{}),
 	}
 
 	// Initial queries scheduling.
@@ -72,7 +75,7 @@ func (j *Jobber) CreateQuery(keywords, location string) error {
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-		// If the query exist we return no error.
+		// If the query exist we just return. The server will respond with the RSS feed url.
 		return nil
 	}
 	if err != nil {
@@ -87,10 +90,14 @@ func (j *Jobber) CreateQuery(keywords, location string) error {
 	// After creating a new query we schedule it and run it immediately
 	// so the feed has initial data. In the frontend we use a spinner
 	// with htmx while this is being processed.
-	// TODO: currently the scheduler is async and this return immediately.
-	//       create a job with a callback in scheduleQuery and a channel
-	//       to block until the job is done.
 	j.scheduleQuery(query, true)
+
+	// Blocks and waits for the job to finish or for a timeout.
+	select {
+	case <-j.jobDoneCh:
+	case <-time.After(10 * time.Second):
+		j.logger.Info("scheduleQuery in jobber.CreateQuery took more than 10 sec", slog.String("keywords", keywords), slog.String("location", location))
+	}
 
 	return nil
 }
@@ -165,6 +172,7 @@ func (j *Jobber) scheduleQuery(q *db.Query, immediately bool) {
 	opts := []gocron.JobOption{gocron.WithTags(q.Keywords + q.Location)}
 	if immediately {
 		opts = append(opts, gocron.WithStartAt(gocron.WithStartImmediately()))
+		opts = append(opts, gocron.WithEventListeners(gocron.AfterJobRuns(func(uuid.UUID, string) { j.jobDoneCh <- struct{}{} })))
 	}
 
 	cron := fmt.Sprintf("%d * * * *", q.CreatedAt.Time.Minute())
