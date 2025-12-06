@@ -33,7 +33,7 @@ func TestServer(t *testing.T) {
 		params      map[string]string
 		wantStatus  int
 		wantHeaders map[string]string
-		wantBody    bool
+		wantBody    string
 	}{
 		{
 			name:   "with correct values",
@@ -64,7 +64,7 @@ func TestServer(t *testing.T) {
 			},
 			wantStatus:  http.StatusOK,
 			wantHeaders: map[string]string{"Content-Type": "application/rss+xml"},
-			wantBody:    true,
+			wantBody:    "xml",
 		},
 		{
 			name:   "invalid feed", // Returns a valid xml with a single post with instructions.
@@ -76,7 +76,7 @@ func TestServer(t *testing.T) {
 			},
 			wantStatus:  http.StatusOK,
 			wantHeaders: map[string]string{"Content-Type": "application/rss+xml"},
-			wantBody:    true,
+			wantBody:    "xml",
 		},
 		{
 			name:   "with missing param keywords",
@@ -86,6 +86,13 @@ func TestServer(t *testing.T) {
 				queryParamLocation: "berlin",
 			},
 			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "help page",
+			path:       "/help",
+			method:     http.MethodGet,
+			wantStatus: http.StatusOK,
+			wantBody:   "html",
 		},
 	}
 
@@ -124,7 +131,7 @@ func TestServer(t *testing.T) {
 					}
 				}
 			}
-			if tt.wantBody {
+			if tt.wantBody != "" {
 				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					t.Errorf("unable to read response body: %v", err)
@@ -139,7 +146,7 @@ func TestServer(t *testing.T) {
 				}
 				approvals.UseFolder("approvals")
 				approvals.VerifyString(t, string(body),
-					approvals.Options().ForFile().WithExtension("xml").WithScrubber(scrubber),
+					approvals.Options().ForFile().WithExtension(tt.wantBody).WithScrubber(scrubber),
 				)
 			}
 		})
