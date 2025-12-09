@@ -1,6 +1,7 @@
 package scrape
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/alwedo/jobber/db"
@@ -81,6 +83,17 @@ func TestFetchOffersPage(t *testing.T) {
 			t.Errorf("expected FT_PR to be 'r3600', got %s", gotFTPR)
 		}
 	})
+
+	t.Run("retryable error", func(t *testing.T) {
+		query := &db.Query{
+			Keywords: "retry", // retry keyword makes mock to return 429
+			Location: "the moon",
+		}
+		_, err := l.fetchOffersPage(query, 0)
+		if !errors.Is(err, ErrRetryable) {
+			t.Errorf("wanted err to be ErrRetryable, got %v", err)
+		}
+	})
 }
 
 func TestParseLinkedInBody(t *testing.T) {
@@ -117,22 +130,25 @@ func TestParseLinkedInBody(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	mockResp := newLinkedInMockResp(t)
-	l := &linkedIn{
-		client: &http.Client{Transport: mockResp},
-		logger: slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})),
-	}
-	query := &db.Query{
-		Keywords: "golang",
-		Location: "the moon",
-	}
-	offers, err := l.Scrape(query)
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
-	if len(offers) != 27 {
-		t.Errorf("expected 27 offers, got %d", len(offers))
-	}
+	synctest.Test(t, func(t *testing.T) {
+		mockResp := newLinkedInMockResp(t)
+		l := &linkedIn{
+			client: &http.Client{Transport: mockResp},
+			logger: slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})),
+		}
+		query := &db.Query{
+			Keywords: "golang",
+			Location: "the moon",
+		}
+		offers, err := l.Scrape(query)
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+		synctest.Wait()
+		if len(offers) != 27 {
+			t.Errorf("expected 27 offers, got %d", len(offers))
+		}
+	})
 }
 
 type linkedInMockResp struct {
@@ -155,8 +171,13 @@ func (h *linkedInMockResp) RoundTrip(req *http.Request) (*http.Response, error) 
 		h.t.Fatalf("failed to open %s in mockResp.RoundTrip: %s", fn, err)
 	}
 
+	status := http.StatusOK
+	if req.URL.Query().Get(paramKeywords) == "retry" {
+		status = http.StatusTooManyRequests
+	}
+
 	return &http.Response{
-		StatusCode: http.StatusOK,
+		StatusCode: status,
 		Body:       body,
 	}, nil
 }

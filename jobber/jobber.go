@@ -22,12 +22,11 @@ import (
 )
 
 type Jobber struct {
-	ctx       context.Context
-	scpr      scrape.Scraper
-	logger    *slog.Logger
-	db        *db.Queries
-	sched     gocron.Scheduler
-	jobDoneCh chan struct{}
+	ctx    context.Context
+	scpr   scrape.Scraper
+	logger *slog.Logger
+	db     *db.Queries
+	sched  gocron.Scheduler
 }
 
 func New(log *slog.Logger, db *db.Queries) (*Jobber, func()) {
@@ -40,12 +39,11 @@ func NewConfigurableJobber(log *slog.Logger, db *db.Queries, s scrape.Scraper) (
 		log.Error("failed to create scheduler", slog.String("error", err.Error()))
 	}
 	j := &Jobber{
-		ctx:       context.Background(),
-		scpr:      s,
-		logger:    log,
-		db:        db,
-		sched:     sched,
-		jobDoneCh: make(chan struct{}),
+		ctx:    context.Background(),
+		scpr:   s,
+		logger: log,
+		db:     db,
+		sched:  sched,
 	}
 
 	// Initial queries scheduling.
@@ -54,7 +52,7 @@ func NewConfigurableJobber(log *slog.Logger, db *db.Queries, s scrape.Scraper) (
 		j.logger.Error("unable to list queries in jobber.scheduleQueries", slog.String("error", err.Error()))
 	}
 	for _, q := range queries {
-		j.scheduleQuery(q, false)
+		j.scheduleQuery(q)
 	}
 	// TODO: schedule a job to delete offers older than 7 days.
 	j.sched.Start()
@@ -90,11 +88,20 @@ func (j *Jobber) CreateQuery(keywords, location string) error {
 	// After creating a new query we schedule it and run it immediately
 	// so the feed has initial data. In the frontend we use a spinner
 	// with htmx while this is being processed.
-	j.scheduleQuery(query, true)
+	done := make(chan struct{})
+	o := []gocron.JobOption{
+		gocron.WithStartAt(gocron.WithStartImmediately()),
+		gocron.WithEventListeners(gocron.AfterJobRuns(func(uuid.UUID, string) {
+			done <- struct{}{}
+			defer close(done)
+		})),
+	}
+
+	j.scheduleQuery(query, o...)
 
 	// Blocks and waits for the job to finish or for a timeout.
 	select {
-	case <-j.jobDoneCh:
+	case <-done:
 	case <-time.After(10 * time.Second):
 		j.logger.Info("scheduleQuery in jobber.CreateQuery took more than 10 sec", slog.String("keywords", keywords), slog.String("location", location))
 	}
@@ -143,6 +150,19 @@ func (j *Jobber) runQuery(qID int64) {
 	// TODO: extend ctx to scraper
 	offers, err := j.scpr.Scrape(q)
 	if err != nil {
+		if errors.Is(err, scrape.ErrRetryable) {
+			// Upon retryable errors we queue a stand alone job to be run in 5 min.
+			_, jobErr := j.sched.NewJob(
+				gocron.OneTimeJob(gocron.OneTimeJobStartDateTime(time.Now().Add(5*time.Minute))),
+				gocron.NewTask(func(q int64) { j.runQuery(q) }, q.ID),
+			)
+			if jobErr != nil {
+				j.logger.Error("unable to schedule retry job in jobber.runQuery", slog.Int64("queryID", q.ID), slog.String("error", jobErr.Error()))
+				return
+			}
+			j.logger.Info("retryable error for linkedIn search in jobber.runQuery", slog.Int64("queryID", q.ID), slog.String("error", err.Error()))
+			return
+		}
 		j.logger.Error("unable to perform linkedIn search in jobber.runQuery", slog.Int64("queryID", q.ID), slog.String("error", err.Error()))
 		return
 	}
@@ -168,12 +188,9 @@ func (j *Jobber) runQuery(qID int64) {
 	j.logger.Info("successfuly completed jobber.runQuery", slog.Int64("queryID", q.ID), slog.String("keywords", q.Keywords), slog.String("location", q.Location))
 }
 
-func (j *Jobber) scheduleQuery(q *db.Query, immediately bool) {
+func (j *Jobber) scheduleQuery(q *db.Query, o ...gocron.JobOption) {
 	opts := []gocron.JobOption{gocron.WithTags(q.Keywords + q.Location)}
-	if immediately {
-		opts = append(opts, gocron.WithStartAt(gocron.WithStartImmediately()))
-		opts = append(opts, gocron.WithEventListeners(gocron.AfterJobRuns(func(uuid.UUID, string) { j.jobDoneCh <- struct{}{} })))
-	}
+	opts = append(opts, o...)
 
 	cron := fmt.Sprintf("%d * * * *", q.CreatedAt.Time.Minute())
 	job, err := j.sched.NewJob(

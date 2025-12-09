@@ -22,7 +22,7 @@ func TestConstructor(t *testing.T) {
 	defer jCloser()
 
 	t.Run("constructor schedules existing queries", func(t *testing.T) {
-		wantJobs := 3 // Three queries from DB seed.
+		wantJobs := 4 // Four queries from DB seed.
 		gotJobs := len(j.sched.Jobs())
 
 		if wantJobs != gotJobs {
@@ -54,8 +54,10 @@ func TestCreateQuery(t *testing.T) {
 		if q.Location != l {
 			t.Errorf("expected location to be '%s', got %s", l, q.Location)
 		}
-		if len(j.sched.Jobs()) != 4 { // 3 from the seed + the recently created.
-			t.Errorf("expected number of jobs to be 4, got %d", len(j.sched.Jobs()))
+		gotJobs := len(j.sched.Jobs())
+		wantJobs := 5 // Four queries from DB seed + recently created.
+		if wantJobs != gotJobs {
+			t.Errorf("wanted %d jobs, got %d", wantJobs, gotJobs)
 		}
 		time.Sleep(50 * time.Millisecond)
 		for _, jb := range j.sched.Jobs() {
@@ -76,11 +78,13 @@ func TestCreateQuery(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to list queries: %s", err)
 		}
-		if len(q) != 4 { // 3 from the seed + last test.
+		if len(q) != 5 { // 4 from the seed + last test.
 			t.Errorf("expected number of queries to be 4, got %d", len(q))
 		}
-		if len(j.sched.Jobs()) != 4 { // 3 from the seed + last test.
-			t.Errorf("expected number of jobs to be 4, got %d", len(j.sched.Jobs()))
+		wantJobs := 5 // 4 from the seed + last test.
+		gotJobs := len(j.sched.Jobs())
+		if wantJobs != gotJobs {
+			t.Errorf("want %d jobs, got %d", wantJobs, gotJobs)
 		}
 	})
 }
@@ -167,6 +171,19 @@ func TestRunQuery(t *testing.T) {
 			}
 		})
 		// TODO: test adding offer and ignoring existing offer
+	})
+
+	t.Run("scraper retryable error adds job to sched", func(t *testing.T) {
+		q, err := d.GetQuery(context.Background(), &db.GetQueryParams{Keywords: "retry", Location: "berlin"})
+		if err != nil {
+			t.Errorf("unable to retrieve seed query: %v", err)
+		}
+		j.runQuery(q.ID)
+		gotJobs := len(j.sched.Jobs())
+		wantJobs := 5 // Four queries from DB seed + retryable job
+		if wantJobs != gotJobs {
+			t.Errorf("wanted %d  jobs in queue, got %d", wantJobs, gotJobs)
+		}
 	})
 
 	t.Run("with older than 7 days query deletes the query", func(t *testing.T) {

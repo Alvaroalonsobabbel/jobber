@@ -3,10 +3,27 @@
 // Includes a mock implementation for testing.
 package scrape
 
-import "github.com/alwedo/jobber/db"
+import (
+	"errors"
+	"net/http"
+
+	"github.com/alwedo/jobber/db"
+)
 
 type Scraper interface {
 	Scrape(*db.Query) ([]db.CreateOfferParams, error)
+}
+
+var ErrRetryable = errors.New("scrape: retryable error")
+
+var isRetryable = map[int]bool{
+	http.StatusRequestTimeout:      true,
+	http.StatusTooEarly:            true,
+	http.StatusTooManyRequests:     true,
+	http.StatusInternalServerError: true,
+	http.StatusBadGateway:          true,
+	http.StatusServiceUnavailable:  true,
+	http.StatusGatewayTimeout:      true,
 }
 
 type mockScraper struct {
@@ -14,8 +31,12 @@ type mockScraper struct {
 }
 
 func (m *mockScraper) Scrape(q *db.Query) ([]db.CreateOfferParams, error) {
+	o := []db.CreateOfferParams{}
 	m.LastQuery = q
-	return []db.CreateOfferParams{}, nil
+	if q.Keywords == "retry" {
+		return o, ErrRetryable
+	}
+	return o, nil
 }
 
 var MockScraper = &mockScraper{}
