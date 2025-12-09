@@ -68,8 +68,8 @@ func (l *linkedIn) fetchOffersPage(query *db.Query, start int) (io.ReadCloser, e
 	if start != 0 {
 		qp.Add(paramStart, strconv.Itoa(start))
 	}
-
 	ftpr := oneWeekInSeconds
+
 	// UpdatedAt is updated every time we run the query against LinkedIn.
 	// If the query has a valid UpdateAt field we don't use the default f_TPR
 	// value (a week) but the time difference between the last query and now.
@@ -78,19 +78,32 @@ func (l *linkedIn) fetchOffersPage(query *db.Query, start int) (io.ReadCloser, e
 	}
 	qp.Add(paramFTPR, fmt.Sprintf("r%d", ftpr))
 
+	// When creating new queries with a week of job offers we might hit LinkedIn's
+	// API rate limit. To avoid that we add a bit of a delay after the first http call.
+	if ftpr == oneWeekInSeconds && start != 0 {
+		time.Sleep(200 * time.Millisecond)
+	}
+
 	url, err := url.Parse(linkedInURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse URL: %w", err)
 	}
 	url.RawQuery = qp.Encode()
 
-	// TODO: implement retry mechanism.
 	resp, err := l.client.Get(url.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch URL: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("received status code: %d", resp.StatusCode)
+		if isRetryable[resp.StatusCode] {
+			return nil, ErrRetryable
+		}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read response body: %w", err)
+		}
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("received status code: %d, message: %s", resp.StatusCode, string(body))
 	}
 	return resp.Body, nil
 }
