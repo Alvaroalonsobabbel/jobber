@@ -46,7 +46,7 @@ func NewConfigurableJobber(log *slog.Logger, db *db.Queries, s scrape.Scraper) (
 		sched:  sched,
 	}
 
-	// Initial queries scheduling.
+	// Initial job scheduling.
 	queries, err := j.db.ListQueries(j.ctx)
 	if err != nil {
 		j.logger.Error("unable to list queries in jobber.scheduleQueries", slog.String("error", err.Error()))
@@ -54,7 +54,7 @@ func NewConfigurableJobber(log *slog.Logger, db *db.Queries, s scrape.Scraper) (
 	for _, q := range queries {
 		j.scheduleQuery(q)
 	}
-	// TODO: schedule a job to delete offers older than 7 days.
+	j.schedDeleteOldOffers()
 	j.sched.Start()
 
 	return j, func() {
@@ -204,4 +204,20 @@ func (j *Jobber) scheduleQuery(q *db.Query, o ...gocron.JobOption) {
 	}
 
 	j.logger.Info("scheduled query", slog.Int64("queryID", q.ID), slog.String("cron", cron), slog.Any("tags", job.Tags()))
+}
+
+func (j *Jobber) schedDeleteOldOffers() {
+	at := "0 2 * * *" // Every day at 2:00 am.
+	_, err := j.sched.NewJob(
+		gocron.CronJob(at, false),
+		gocron.NewTask(func() {
+			if err := j.db.DeleteOldOffers(j.ctx); err != nil {
+				j.logger.Error("unable to delete old offers", slog.String("error", err.Error()))
+			}
+		}),
+		gocron.WithStartAt(gocron.WithStartImmediately()),
+	)
+	if err != nil {
+		j.logger.Error("unable to schedule DeleteOldOffers job", slog.String("error", err.Error()))
+	}
 }

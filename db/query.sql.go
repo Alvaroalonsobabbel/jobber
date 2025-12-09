@@ -78,6 +78,16 @@ func (q *Queries) CreateQueryOfferAssoc(ctx context.Context, arg *CreateQueryOff
 	return err
 }
 
+const deleteOldOffers = `-- name: DeleteOldOffers :exec
+DELETE FROM offers
+WHERE posted_at < NOW() - INTERVAL '7 days'
+`
+
+func (q *Queries) DeleteOldOffers(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteOldOffers)
+	return err
+}
+
 const deleteQuery = `-- name: DeleteQuery :exec
 DELETE FROM queries
 WHERE

@@ -68,3 +68,7 @@ ORDER BY
 INSERT INTO query_offers (query_id, offer_id)
 VALUES ($1, $2)
 ON CONFLICT (query_id, offer_id) DO NOTHING;
+
+-- name: DeleteOldOffers :exec
+DELETE FROM offers
+WHERE posted_at < NOW() - INTERVAL '7 days';
