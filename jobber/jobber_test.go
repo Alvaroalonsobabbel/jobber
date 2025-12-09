@@ -12,7 +12,6 @@ import (
 
 	"github.com/alwedo/jobber/db"
 	"github.com/alwedo/jobber/scrape"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func TestConstructor(t *testing.T) {
@@ -21,6 +20,9 @@ func TestConstructor(t *testing.T) {
 	defer dbCloser()
 	j, jCloser := NewConfigurableJobber(l, d, scrape.MockScraper)
 	defer jCloser()
+
+	// Give the scheduler time to process initial jobs.
+	time.Sleep(100 * time.Millisecond)
 
 	t.Run("constructor schedules existing queries", func(t *testing.T) {
 		wantJobs := 5 // Four queries from DB seed + old offers deletetion.
@@ -32,10 +34,7 @@ func TestConstructor(t *testing.T) {
 	})
 
 	t.Run("old offers should've been deleted", func(t *testing.T) {
-		offers, err := d.ListOffers(context.Background(), &db.ListOffersParams{
-			ID:       1,
-			PostedAt: pgtype.Timestamptz{Time: time.Now().AddDate(0, 0, -10), Valid: true}, // List offers posted in the last 10 days.
-		})
+		offers, err := d.ListOffers(context.Background(), 1)
 		if err != nil {
 			t.Errorf("wanted no error, got: %v", err)
 		}
@@ -110,6 +109,9 @@ func TestListOffers(t *testing.T) {
 	j, jCloser := NewConfigurableJobber(l, d, scrape.MockScraper)
 	defer jCloser()
 
+	// Give the scheduler time to process initial jobs.
+	time.Sleep(100 * time.Millisecond)
+
 	tests := []struct {
 		name       string
 		keywords   string
@@ -125,10 +127,11 @@ func TestListOffers(t *testing.T) {
 			wantErr:    nil,
 		},
 		{
-			name:       "valid query with older than 7 days offers",
-			keywords:   "python",
-			location:   "san francisco",
-			wantOffers: 1, // query has two offers, one is older than 7 days.
+			name:     "valid query with older than 7 days offers",
+			keywords: "python",
+			location: "san francisco",
+			// Query has two offers in the DB seed. One is older than 7 days and should've be deleted.
+			wantOffers: 1,
 		},
 		{
 			name:     "invalid query with no offers",

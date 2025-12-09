@@ -18,7 +18,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Jobber struct {
@@ -123,10 +122,7 @@ func (j *Jobber) ListOffers(keywords, location string) ([]*db.Offer, error) {
 	if err := j.db.UpdateQueryQAT(j.ctx, q.ID); err != nil {
 		j.logger.Error("unable to update query timestamp", slog.Int64("queryID", q.ID), slog.String("error", err.Error()))
 	}
-	return j.db.ListOffers(j.ctx, &db.ListOffersParams{
-		ID:       q.ID,
-		PostedAt: pgtype.Timestamptz{Time: time.Now().AddDate(0, 0, -7), Valid: true}, // List offers posted in the last 7 days.
-	})
+	return j.db.ListOffers(j.ctx, q.ID)
 }
 
 func (j *Jobber) runQuery(qID int64) {

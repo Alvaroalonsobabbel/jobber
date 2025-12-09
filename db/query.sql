@@ -60,7 +60,6 @@ FROM
     JOIN offers o ON qo.offer_id = o.id
 WHERE
     q.id = $1
-    AND o.posted_at >= $2
 ORDER BY
     o.posted_at DESC;
 
